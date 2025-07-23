@@ -6,30 +6,25 @@ st.title("DLS Data 2x3 Plotter")
 
 uploaded_file = st.file_uploader("Upload your DLS Excel file", type=["xlsx"])
 weightings = ["Intensity", "Number", "Volume"]
-dls_types = ["MADLS", "Back Scatter"]  # For reference in grid
 
 if uploaded_file is not None:
-    # Read all sheets at once
     sheets = pd.read_excel(uploaded_file, sheet_name=None)
-
-    # Sheet order: intensity, number, volume
     fig, axes = plt.subplots(2, 3, figsize=(15, 8), sharex=True)
     plt.subplots_adjust(hspace=0.3, wspace=0.2)
 
     for col_idx, weighting in enumerate(weightings):
         df = sheets[weighting]
-        
-        # MADLS: Columns A-G (first 7 columns, index 0-6)
-        madls_df = df.iloc[:, 0:7]
-        # Back Scatter: Columns J-P (10-16)
-        back_df = df.iloc[:, 9:16]
 
-        # The first column is diameter (nm)
+        # MADLS columns: A-G ("Diameter (nm)", then 6 conditions)
+        madls_cols = [col for col in df.columns[:7] if "Diameter" in col or "MB" in col or "NB" in col or "Stock" in col]
+        madls_df = df[madls_cols].dropna(subset=[madls_cols[0]])
         diameter_madls = madls_df.iloc[:, 0]
-        diameter_back = back_df.iloc[:, 0]
-
-        # Experiment/condition names (skip diameter column)
         madls_conditions = madls_df.columns[1:]
+
+        # Back Scatter columns: J-P (columns 9 to 15, zero-indexed)
+        back_cols = [col for col in df.columns[9:16] if "Diameter" in col or "MB" in col or "NB" in col or "Stock" in col]
+        back_df = df[back_cols].dropna(subset=[back_cols[0]])
+        diameter_back = back_df.iloc[:, 0]
         back_conditions = back_df.columns[1:]
 
         # Plot MADLS
@@ -37,7 +32,7 @@ if uploaded_file is not None:
         for cond in madls_conditions:
             y = madls_df[cond]
             ax_madls.plot(diameter_madls, y, label=cond)
-        ax_madls.set_title(f"MADLS - {weighting.title()}")
+        ax_madls.set_title(f"MADLS - {weighting}")
         ax_madls.set_xlim(0, 1000)
         ax_madls.set_xlabel("Diameter (nm)")
         if col_idx == 0:
@@ -49,7 +44,7 @@ if uploaded_file is not None:
         for cond in back_conditions:
             y = back_df[cond]
             ax_back.plot(diameter_back, y, label=cond)
-        ax_back.set_title(f"Back Scatter - {weighting.title()}")
+        ax_back.set_title(f"Back Scatter - {weighting}")
         ax_back.set_xlim(0, 1000)
         ax_back.set_xlabel("Diameter (nm)")
         if col_idx == 0:
