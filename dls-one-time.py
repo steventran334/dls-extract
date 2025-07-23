@@ -23,7 +23,6 @@ Drop your file below.
 
 st.image("dls_example.png", caption="Example DLS spreadsheet format", use_container_width=True)
 
-# --- DLS upload and dropdown ---
 dls_file = st.file_uploader("Upload DLS Excel file", type=["xlsx"])
 sheet_selected = None
 
@@ -33,6 +32,19 @@ if dls_file:
     sheet_selected = st.selectbox("Select DLS condition (sheet)", sheets)
     dls = pd.read_excel(xls, sheet_name=sheet_selected, header=[0,1,2], skiprows=[0,1])
 
+    # --- X-Axis Range Selectors ---
+    st.subheader("X-Axis Ranges (Diameter in nm)")
+
+    bs_x_min, bs_x_max = st.slider(
+        "Back Scatter: Set the x-axis (diameter) range",
+        min_value=0, max_value=5000, value=(0, 1000), step=10, key="bs_slider"
+    )
+
+    madls_x_min, madls_x_max = st.slider(
+        "MADLS: Set the x-axis (diameter) range",
+        min_value=0, max_value=5000, value=(0, 1000), step=10, key="madls_slider"
+    )
+
     def find_col(dls, type_main, weight):
         for col in dls.columns:
             col_str = ' '.join(str(c).lower() for c in col)
@@ -40,8 +52,7 @@ if dls_file:
                 return col
         return None
 
-    # --- Plotting and Export Helper ---
-    def get_plot_and_csvs(main_types, title_prefix):
+    def get_plot_and_csvs(main_types, title_prefix, x_min, x_max):
         plot_titles = [
             f"{title_prefix} - Intensity",
             f"{title_prefix} - Number",
@@ -49,7 +60,6 @@ if dls_file:
         ]
         weights = ["intensity", "number", "volume"]
         figs = []
-        svg_files = []
         csv_files = []
         for main, weight, title in zip(main_types, weights, plot_titles):
             size_col = find_col(dls, main, "size")
@@ -72,10 +82,11 @@ if dls_file:
             # Plot
             fig, ax = plt.subplots(figsize=(5, 4))
             ax.plot(x, y_norm, label="DLS", color='black', lw=2)
-            ax.set_xlim([0, 1000])
-            ax.set_ylim([0, 1.1])
-            ax.set_xticks([0, 200, 400, 600, 800, 1000])
-            ax.set_xticklabels(['0', '200', '400', '600', '800', '1000'])
+            ax.set_xlim([x_min, x_max])
+            n_ticks = 6
+            xticks = np.linspace(x_min, x_max, n_ticks)
+            ax.set_xticks(xticks)
+            ax.set_xticklabels([str(int(t)) for t in xticks])
             ax.set_xlabel("Diameter (nm)")
             ax.set_ylabel("%")
             ax.set_title(title)
@@ -98,7 +109,7 @@ if dls_file:
 
     # --- BACK SCATTER PREVIEW & DOWNLOAD ---
     st.subheader("Back Scatter Distributions")
-    back_figs, back_csv_files = get_plot_and_csvs(["back"]*3, "Back Scatter")
+    back_figs, back_csv_files = get_plot_and_csvs(["back"]*3, "Back Scatter", bs_x_min, bs_x_max)
     if back_figs:
         fig, axs = plt.subplots(1, 3, figsize=(16, 5), sharey=True)
         for i, f in enumerate(back_figs):
@@ -138,7 +149,7 @@ if dls_file:
 
     # --- MADLS PREVIEW & DOWNLOAD ---
     st.subheader("MADLS Distributions")
-    madls_figs, madls_csv_files = get_plot_and_csvs(["madls"]*3, "MADLS")
+    madls_figs, madls_csv_files = get_plot_and_csvs(["madls"]*3, "MADLS", madls_x_min, madls_x_max)
     if madls_figs:
         fig, axs = plt.subplots(1, 3, figsize=(16, 5), sharey=True)
         for i, f in enumerate(madls_figs):
