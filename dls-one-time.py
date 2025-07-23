@@ -115,7 +115,7 @@ if dls_file:
     back_figs, back_csv_files = get_plot_and_csvs(["back"]*3, "Back Scatter", bs_x_min, bs_x_max)
     if back_figs:
         fig, axs = plt.subplots(1, 3, figsize=(16, 5), sharey=True)
-        fig.suptitle(f"Condition: {sheet_selected}", fontsize=20, y=1.08)
+        fig.suptitle(f"{sheet_selected}", fontsize=20, y=1.08)
         for i, f in enumerate(back_figs):
             ax = axs[i]
             tmp = f.axes[0]
@@ -157,7 +157,7 @@ if dls_file:
     madls_figs, madls_csv_files = get_plot_and_csvs(["madls"]*3, "MADLS", madls_x_min, madls_x_max)
     if madls_figs:
         fig, axs = plt.subplots(1, 3, figsize=(16, 5), sharey=True)
-        fig.suptitle(f"Condition: {sheet_selected}", fontsize=20, y=1.08)
+        fig.suptitle(f"{sheet_selected}", fontsize=20, y=1.08)
         for i, f in enumerate(madls_figs):
             ax = axs[i]
             tmp = f.axes[0]
