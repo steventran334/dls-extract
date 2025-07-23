@@ -47,6 +47,22 @@ if dls_file:
         madls_x_min = st.number_input("MADLS Min (nm)", min_value=0, max_value=5000, value=0, step=10, key="madls_xmin")
         madls_x_max = st.number_input("MADLS Max (nm)", min_value=0, max_value=5000, value=1000, step=10, key="madls_xmax")
 
+    # --- Editable titles for each plot group ---
+    st.subheader("Custom Titles (Optional)")
+    col3, col4 = st.columns(2)
+    with col3:
+        back_title = st.text_input(
+            "Back Scatter Plot Title",
+            value=sheet_selected,
+            key="back_title"
+        )
+    with col4:
+        madls_title = st.text_input(
+            "MADLS Plot Title",
+            value=sheet_selected,
+            key="madls_title"
+        )
+
     def find_col(dls, type_main, weight):
         for col in dls.columns:
             col_str = ' '.join(str(c).lower() for c in col)
@@ -110,12 +126,12 @@ if dls_file:
         return zip_buffer.getvalue()
 
     # --- BACK SCATTER PREVIEW & DOWNLOAD ---
-    st.markdown(f"### Condition: `{sheet_selected}`")
+    st.markdown(f"### Condition: `{back_title}`")
     st.subheader("Back Scatter Distributions")
     back_figs, back_csv_files = get_plot_and_csvs(["back"]*3, "Back Scatter", bs_x_min, bs_x_max)
     if back_figs:
         fig, axs = plt.subplots(1, 3, figsize=(16, 5), sharey=True)
-        fig.suptitle(f"{sheet_selected}", fontsize=20, y=1.08)
+        fig.suptitle(f"{back_title}", fontsize=20, y=1.08)
         for i, f in enumerate(back_figs):
             ax = axs[i]
             tmp = f.axes[0]
@@ -140,24 +156,24 @@ if dls_file:
         st.download_button(
             label="Download Back Scatter (1x3 SVG)",
             data=svg_buf.getvalue(),
-            file_name=f"{sheet_selected}_BackScatter_1x3.svg",
+            file_name=f"{back_title}_BackScatter_1x3.svg",
             mime="image/svg+xml"
         )
         plt.close(fig)
         st.download_button(
             label="Download All Back Scatter CSVs (ZIP)",
             data=make_zip(back_csv_files),
-            file_name=f"{sheet_selected}_BackScatter_CSVs.zip",
+            file_name=f"{back_title}_BackScatter_CSVs.zip",
             mime="application/zip"
         )
 
     # --- MADLS PREVIEW & DOWNLOAD ---
-    st.markdown(f"### Condition: `{sheet_selected}`")
+    st.markdown(f"### Condition: `{madls_title}`")
     st.subheader("MADLS Distributions")
     madls_figs, madls_csv_files = get_plot_and_csvs(["madls"]*3, "MADLS", madls_x_min, madls_x_max)
     if madls_figs:
         fig, axs = plt.subplots(1, 3, figsize=(16, 5), sharey=True)
-        fig.suptitle(f"{sheet_selected}", fontsize=20, y=1.08)
+        fig.suptitle(f"{madls_title}", fontsize=20, y=1.08)
         for i, f in enumerate(madls_figs):
             ax = axs[i]
             tmp = f.axes[0]
@@ -182,14 +198,14 @@ if dls_file:
         st.download_button(
             label="Download MADLS (1x3 SVG)",
             data=svg_buf.getvalue(),
-            file_name=f"{sheet_selected}_MADLS_1x3.svg",
+            file_name=f"{madls_title}_MADLS_1x3.svg",
             mime="image/svg+xml"
         )
         plt.close(fig)
         st.download_button(
             label="Download All MADLS CSVs (ZIP)",
             data=make_zip(madls_csv_files),
-            file_name=f"{sheet_selected}_MADLS_CSVs.zip",
+            file_name=f"{madls_title}_MADLS_CSVs.zip",
             mime="application/zip"
         )
 
