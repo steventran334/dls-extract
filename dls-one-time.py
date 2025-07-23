@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 st.title("DLS Data 2x3 Plotter")
 
 uploaded_file = st.file_uploader("Upload your DLS Excel file", type=["xlsx"])
-weightings = ["intensity", "number", "volume"]
+weightings = ["Intensity", "Number", "Volume"]
 dls_types = ["MADLS", "Back Scatter"]  # For reference in grid
 
 if uploaded_file is not None:
