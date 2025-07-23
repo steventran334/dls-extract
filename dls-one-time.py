@@ -1,49 +1,180 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
+import io
+import zipfile
 
-st.title("DLS Data 2x3 Plotter")
+st.title("DLS Distributions Preview & Export")
 
-uploaded_file = st.file_uploader("Upload your DLS Excel file", type=["xlsx"])
-weightings = ["Intensity", "Number", "Volume"]
+st.markdown("""
+<div style="background-color:#E8F0FE;padding:16px 24px 16px 24px;border-radius:14px;margin-bottom:20px;">
+<b>Instructions:</b><br>
+<b>DLS graphs must be formatted exactly:</b>
+<ul style="margin-top:0;margin-bottom:0;">
+<li>Sheet name: name of experiment (e.g. stock of NBs)</li>
+<li>Back scatter data: in columns starting at column A</li>
+<li>MADLS data: in columns starting at column H</li>
+<li>Each contains intensity, number, and volume weighted distributions</li>
+</ul>
+Drop your file below.
+</div>
+""", unsafe_allow_html=True)
 
-if uploaded_file is not None:
-    sheets = pd.read_excel(uploaded_file, sheet_name=None)
-    fig, axes = plt.subplots(2, 3, figsize=(15, 8), sharex=True)
-    plt.subplots_adjust(hspace=0.3, wspace=0.2)
+st.image("dls_example.png", caption="Example DLS spreadsheet format", use_container_width=True)
 
-    for col_idx, weighting in enumerate(weightings):
-        df = sheets[weighting]
+# --- DLS upload and dropdown ---
+dls_file = st.file_uploader("Upload DLS Excel file", type=["xlsx"])
+sheet_selected = None
 
-        # MADLS: A = Diameter (nm), B-G = conditions (index 0–6)
-        diameter_madls = df.iloc[:, 0]
-        madls_conditions = df.columns[1:7]  # B-G
-        # Back Scatter: J = Diameter (nm), K-P = conditions (index 9–15)
-        diameter_back = df.iloc[:, 9]
-        back_conditions = df.columns[10:16]  # K-P
+if dls_file:
+    xls = pd.ExcelFile(dls_file)
+    sheets = xls.sheet_names
+    sheet_selected = st.selectbox("Select DLS condition (sheet)", sheets)
+    dls = pd.read_excel(xls, sheet_name=sheet_selected, header=[0,1,2], skiprows=[0,1])
 
-        # Plot MADLS
-        ax_madls = axes[1, col_idx]
-        for cond in madls_conditions:
-            y = df[cond]
-            ax_madls.plot(diameter_madls, y, label=cond)
-        ax_madls.set_title(f"MADLS - {weighting}")
-        ax_madls.set_xlim(0, 1000)
-        ax_madls.set_xlabel("Diameter (nm)")
-        if col_idx == 0:
-            ax_madls.set_ylabel("Value")
-        ax_madls.legend(fontsize=7)
+    def find_col(dls, type_main, weight):
+        for col in dls.columns:
+            col_str = ' '.join(str(c).lower() for c in col)
+            if type_main in col_str and weight in col_str:
+                return col
+        return None
 
-        # Plot Back Scatter
-        ax_back = axes[0, col_idx]
-        for cond in back_conditions:
-            y = df[cond]
-            ax_back.plot(diameter_back, y, label=cond)
-        ax_back.set_title(f"Back Scatter - {weighting}")
-        ax_back.set_xlim(0, 1000)
-        ax_back.set_xlabel("Diameter (nm)")
-        if col_idx == 0:
-            ax_back.set_ylabel("Value")
-        ax_back.legend(fontsize=7)
+    # --- Plotting and Export Helper ---
+    def get_plot_and_csvs(main_types, title_prefix):
+        plot_titles = [
+            f"{title_prefix} - Intensity",
+            f"{title_prefix} - Number",
+            f"{title_prefix} - Volume",
+        ]
+        weights = ["intensity", "number", "volume"]
+        figs = []
+        svg_files = []
+        csv_files = []
+        for main, weight, title in zip(main_types, weights, plot_titles):
+            size_col = find_col(dls, main, "size")
+            dist_col = find_col(dls, main, weight)
+            if size_col is None or dist_col is None:
+                continue
+            x = dls[size_col].astype(float).values
+            y = dls[dist_col].astype(float).values
+            msk = ~np.isnan(x) & ~np.isnan(y)
+            x, y = x[msk], y[msk]
+            y_norm = y / np.max(y) if np.max(y) > 0 else y
 
-    st.pyplot(fig)
+            # CSV Output
+            df_csv = pd.DataFrame({
+                "DLS Diameter (nm)": x,
+                f"DLS {weight.capitalize()} (%)": y,
+                f"DLS {weight.capitalize()} (normalized by max)": y_norm
+            })
+
+            # Plot
+            fig, ax = plt.subplots(figsize=(5, 4))
+            ax.plot(x, y_norm, label="DLS", color='black', lw=2)
+            ax.set_xlim([0, 1000])
+            ax.set_ylim([0, 1.1])
+            ax.set_xticks([0, 200, 400, 600, 800, 1000])
+            ax.set_xticklabels(['0', '200', '400', '600', '800', '1000'])
+            ax.set_xlabel("Diameter (nm)")
+            ax.set_ylabel("%")
+            ax.set_title(title)
+            ax.legend()
+            figs.append(fig)
+
+            # Save CSV in memory for zipping
+            csv_data = df_csv.to_csv(index=False)
+            fname_base = f"{sheet_selected}_{title.replace(' ','_')}"
+            csv_files.append((f"{fname_base}.csv", csv_data))
+            plt.close(fig)
+        return figs, csv_files
+
+    def make_zip(name_pairs):
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            for fname, data in name_pairs:
+                zf.writestr(fname, data)
+        return zip_buffer.getvalue()
+
+    # --- BACK SCATTER PREVIEW & DOWNLOAD ---
+    st.subheader("Back Scatter Distributions")
+    back_figs, back_csv_files = get_plot_and_csvs(["back"]*3, "Back Scatter")
+    if back_figs:
+        fig, axs = plt.subplots(1, 3, figsize=(16, 5), sharey=True)
+        for i, f in enumerate(back_figs):
+            ax = axs[i]
+            tmp = f.axes[0]
+            for line in tmp.lines:
+                ax.plot(line.get_xdata(), line.get_ydata(),
+                        label=line.get_label(), color=line.get_color(),
+                        lw=line.get_linewidth(), linestyle=line.get_linestyle())
+            ax.set_xlim(tmp.get_xlim())
+            ax.set_ylim(tmp.get_ylim())
+            ax.set_xticks(tmp.get_xticks())
+            ax.set_xticklabels(tmp.get_xticklabels())
+            ax.set_xlabel(tmp.get_xlabel())
+            ax.set_title(tmp.get_title())
+            if i == 0:
+                ax.set_ylabel(tmp.get_ylabel())
+            ax.legend()
+        plt.tight_layout()
+        st.pyplot(fig)
+        # SVG download (as 1x3 panel)
+        svg_buf = io.StringIO()
+        fig.savefig(svg_buf, format="svg", bbox_inches='tight')
+        st.download_button(
+            label="Download Back Scatter (1x3 SVG)",
+            data=svg_buf.getvalue(),
+            file_name=f"{sheet_selected}_BackScatter_1x3.svg",
+            mime="image/svg+xml"
+        )
+        plt.close(fig)
+        st.download_button(
+            label="Download All Back Scatter CSVs (ZIP)",
+            data=make_zip(back_csv_files),
+            file_name=f"{sheet_selected}_BackScatter_CSVs.zip",
+            mime="application/zip"
+        )
+
+    # --- MADLS PREVIEW & DOWNLOAD ---
+    st.subheader("MADLS Distributions")
+    madls_figs, madls_csv_files = get_plot_and_csvs(["madls"]*3, "MADLS")
+    if madls_figs:
+        fig, axs = plt.subplots(1, 3, figsize=(16, 5), sharey=True)
+        for i, f in enumerate(madls_figs):
+            ax = axs[i]
+            tmp = f.axes[0]
+            for line in tmp.lines:
+                ax.plot(line.get_xdata(), line.get_ydata(),
+                        label=line.get_label(), color=line.get_color(),
+                        lw=line.get_linewidth(), linestyle=line.get_linestyle())
+            ax.set_xlim(tmp.get_xlim())
+            ax.set_ylim(tmp.get_ylim())
+            ax.set_xticks(tmp.get_xticks())
+            ax.set_xticklabels(tmp.get_xticklabels())
+            ax.set_xlabel(tmp.get_xlabel())
+            ax.set_title(tmp.get_title())
+            if i == 0:
+                ax.set_ylabel(tmp.get_ylabel())
+            ax.legend()
+        plt.tight_layout()
+        st.pyplot(fig)
+        # SVG download (as 1x3 panel)
+        svg_buf = io.StringIO()
+        fig.savefig(svg_buf, format="svg", bbox_inches='tight')
+        st.download_button(
+            label="Download MADLS (1x3 SVG)",
+            data=svg_buf.getvalue(),
+            file_name=f"{sheet_selected}_MADLS_1x3.svg",
+            mime="image/svg+xml"
+        )
+        plt.close(fig)
+        st.download_button(
+            label="Download All MADLS CSVs (ZIP)",
+            data=make_zip(madls_csv_files),
+            file_name=f"{sheet_selected}_MADLS_CSVs.zip",
+            mime="application/zip"
+        )
+
+else:
+    st.info("Upload a DLS Excel file and select a condition (sheet) to view plots and downloads.")
