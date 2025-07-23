@@ -32,18 +32,20 @@ if dls_file:
     sheet_selected = st.selectbox("Select DLS condition (sheet)", sheets)
     dls = pd.read_excel(xls, sheet_name=sheet_selected, header=[0,1,2], skiprows=[0,1])
 
-    # --- X-Axis Range Selectors ---
+    # --- X-Axis Range Numeric Inputs ---
     st.subheader("X-Axis Ranges (Diameter in nm)")
 
-    bs_x_min, bs_x_max = st.slider(
-        "Back Scatter: Set the x-axis (diameter) range",
-        min_value=0, max_value=5000, value=(0, 1000), step=10, key="bs_slider"
-    )
+    col1, col2 = st.columns(2)
 
-    madls_x_min, madls_x_max = st.slider(
-        "MADLS: Set the x-axis (diameter) range",
-        min_value=0, max_value=5000, value=(0, 1000), step=10, key="madls_slider"
-    )
+    with col1:
+        st.markdown("**Back Scatter X-Axis Limits**")
+        bs_x_min = st.number_input("Back Scatter Min (nm)", min_value=0, max_value=5000, value=0, step=10, key="bs_xmin")
+        bs_x_max = st.number_input("Back Scatter Max (nm)", min_value=0, max_value=5000, value=1000, step=10, key="bs_xmax")
+
+    with col2:
+        st.markdown("**MADLS X-Axis Limits**")
+        madls_x_min = st.number_input("MADLS Min (nm)", min_value=0, max_value=5000, value=0, step=10, key="madls_xmin")
+        madls_x_max = st.number_input("MADLS Max (nm)", min_value=0, max_value=5000, value=1000, step=10, key="madls_xmax")
 
     def find_col(dls, type_main, weight):
         for col in dls.columns:
