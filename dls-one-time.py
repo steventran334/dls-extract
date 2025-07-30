@@ -26,6 +26,18 @@ st.image("dls_example.png", caption="Example DLS spreadsheet format", use_contai
 dls_file = st.file_uploader("Upload DLS Excel file", type=["xlsx"])
 sheet_selected = None
 
+def find_col(dls, type_main, weight):
+    # Require "back scatter" or "madls" in the column name for specificity
+    for col in dls.columns:
+        col_str = ' '.join(str(c).lower() for c in col)
+        if type_main == "back":
+            if "back scatter" in col_str and weight in col_str:
+                return col
+        elif type_main == "madls":
+            if "madls" in col_str and weight in col_str:
+                return col
+    return None
+
 if dls_file:
     xls = pd.ExcelFile(dls_file)
     sheets = xls.sheet_names
@@ -63,13 +75,6 @@ if dls_file:
             key="madls_title"
         )
 
-    def find_col(dls, type_main, weight):
-        for col in dls.columns:
-            col_str = ' '.join(str(c).lower() for c in col)
-            if type_main in col_str and weight in col_str:
-                return col
-        return None
-
     def get_overlay_plot_and_csvs(main_type, title_prefix, x_min, x_max):
         weights = ["intensity", "number", "volume"]
         colors = ["black", "red", "blue"]
@@ -80,12 +85,12 @@ if dls_file:
             size_col = find_col(dls, main_type, "size")
             dist_col = find_col(dls, main_type, weight)
             if size_col is None or dist_col is None:
+                st.warning(f"Could not find {weight} column for {main_type}.")
                 continue
             x = dls[size_col].astype(float).values
             y = dls[dist_col].astype(float).values
             msk = ~np.isnan(x) & ~np.isnan(y)
             x, y = x[msk], y[msk]
-            # Use the true maximum for normalization
             max_y = y.max()
             y_norm = y / max_y if max_y > 0 else y
 
