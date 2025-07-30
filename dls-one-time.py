@@ -83,21 +83,29 @@ if dls_file:
                 continue
             x = dls[size_col].astype(float).values
             y = dls[dist_col].astype(float).values
+
+            # Mask out NaNs
             msk = ~np.isnan(x) & ~np.isnan(y)
             x, y = x[msk], y[msk]
-            y_norm = y / np.max(y) if np.max(y) > 0 else y
 
-            # CSV Output
+            # Mask out tiny values (below 1% of max) for normalization and plotting
+            max_y = np.max(y)
+            threshold = 0.01 * max_y if max_y > 0 else 0
+            msk2 = y > threshold
+            x_plot, y_plot = x[msk2], y[msk2]
+            y_norm = y_plot / np.max(y_plot) if np.max(y_plot) > 0 else y_plot
+
+            # CSV Output (full, not masked)
             df_csv = pd.DataFrame({
                 "DLS Diameter (nm)": x,
                 f"DLS {weight.capitalize()} (%)": y,
-                f"DLS {weight.capitalize()} (normalized by max)": y_norm
+                f"DLS {weight.capitalize()} (normalized by max)": (y / max_y if max_y > 0 else y)
             })
             fname_base = f"{sheet_selected}_{title_prefix}_{label}"
             csv_files.append((f"{fname_base}.csv", df_csv.to_csv(index=False)))
 
-            # Overlay plot
-            ax.plot(x, y_norm, label=label, color=color, lw=2)
+            # Overlay plot (masked)
+            ax.plot(x_plot, y_norm, label=label, color=color, lw=2)
 
         ax.set_xlim([x_min, x_max])
         n_ticks = 6
