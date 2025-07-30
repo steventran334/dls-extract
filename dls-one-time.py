@@ -176,46 +176,5 @@ if dls_file:
             mime="application/zip"
         )
 
-    # --- NUMBER-WEIGHTED DATA EXPORT ---
-    st.markdown("### Export Number-Weighted Data (Back scatter & MADLS)")
-    # Extract correct columns by index (from your file structure)
-    try:
-        back_size_col = dls.columns[7]
-        back_number_col = dls.columns[10]
-        madls_size_col = dls.columns[9]
-        madls_number_col = dls.columns[12]
-
-        back_size = dls[back_size_col].astype(float)
-        back_number = dls[back_number_col].astype(float)
-        back_max = back_number.max()
-        back_norm = back_number / back_max if back_max > 0 else back_number
-
-        madls_size = dls[madls_size_col].astype(float)
-        madls_number = dls[madls_number_col].astype(float)
-        madls_max = madls_number.max()
-        madls_norm = madls_number / madls_max if madls_max > 0 else madls_number
-
-        out = pd.DataFrame({
-            "Back Size (d.nm)": back_size,
-            "Back Number (Percent)": back_number,
-            "Back Number (Normalized)": back_norm,
-            "MADLS Size (d.nm)": madls_size,
-            "MADLS Number (Percent)": madls_number,
-            "MADLS Number (Normalized)": madls_norm,
-        })
-
-        st.dataframe(out)
-
-        csv_buf = io.StringIO()
-        out.to_csv(csv_buf, index=False)
-        st.download_button(
-            label="Download Number-Weighted Data (CSV)",
-            data=csv_buf.getvalue(),
-            file_name=f"{sheet_selected}_number_weighted_normalized.csv",
-            mime="text/csv"
-        )
-    except Exception as e:
-        st.error(f"Error extracting number-weighted data: {e}")
-
 else:
     st.info("Upload a DLS Excel file and select a condition (sheet) to view plots and downloads.")
