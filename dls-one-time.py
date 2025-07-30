@@ -26,23 +26,6 @@ st.image("dls_example.png", caption="Example DLS spreadsheet format", use_contai
 dls_file = st.file_uploader("Upload DLS Excel file", type=["xlsx"])
 sheet_selected = None
 
-def find_main_peak_region(y):
-    """Find the largest contiguous nonzero region in y and return its indices."""
-    nonzero = np.where(y > 0)[0]
-    if len(nonzero) == 0:
-        return np.array([], dtype=int)
-    # Find splits between contiguous blocks
-    splits = np.where(np.diff(nonzero) > 1)[0]
-    # Get start and end indices of each block
-    block_starts = np.insert(nonzero[splits + 1], 0, nonzero[0])
-    block_ends = np.append(nonzero[splits], nonzero[-1])
-    # Find the largest block
-    block_lengths = block_ends - block_starts + 1
-    largest_block = np.argmax(block_lengths)
-    start = block_starts[largest_block]
-    end = block_ends[largest_block]
-    return np.arange(start, end + 1)
-
 if dls_file:
     xls = pd.ExcelFile(dls_file)
     sheets = xls.sheet_names
@@ -102,27 +85,21 @@ if dls_file:
             y = dls[dist_col].astype(float).values
             msk = ~np.isnan(x) & ~np.isnan(y)
             x, y = x[msk], y[msk]
+            # Use the true maximum for normalization
+            max_y = y.max()
+            y_norm = y / max_y if max_y > 0 else y
 
-            # Find main peak region
-            peak_idx = find_main_peak_region(y)
-            if len(peak_idx) == 0:
-                continue
-            x_peak = x[peak_idx]
-            y_peak = y[peak_idx]
-            peak_max = y_peak.max()
-            y_norm = y_peak / peak_max if peak_max > 0 else y_peak
-
-            # CSV Output (only main peak region)
+            # CSV Output
             df_csv = pd.DataFrame({
-                "DLS Diameter (nm)": x_peak,
-                f"DLS {weight.capitalize()} (%)": y_peak,
-                f"DLS {weight.capitalize()} (normalized by peak)": y_norm
+                "DLS Diameter (nm)": x,
+                f"DLS {weight.capitalize()} (%)": y,
+                f"DLS {weight.capitalize()} (normalized by max)": y_norm
             })
-            fname_base = f"{sheet_selected}_{title_prefix}_{label}_peak"
+            fname_base = f"{sheet_selected}_{title_prefix}_{label}"
             csv_files.append((f"{fname_base}.csv", df_csv.to_csv(index=False)))
 
-            # Overlay plot (only main peak region)
-            ax.plot(x_peak, y_norm, label=label, color=color, lw=2)
+            # Overlay plot
+            ax.plot(x, y_norm, label=label, color=color, lw=2)
 
         ax.set_xlim([x_min, x_max])
         n_ticks = 6
@@ -130,7 +107,7 @@ if dls_file:
         ax.set_xticks(xticks)
         ax.set_xticklabels([str(int(t)) for t in xticks])
         ax.set_xlabel("Diameter (nm)")
-        ax.set_ylabel("% (normalized to peak)")
+        ax.set_ylabel("% (normalized)")
         ax.set_title(title_prefix)
         ax.legend()
         plt.tight_layout()
@@ -145,7 +122,7 @@ if dls_file:
 
     # --- BACK SCATTER PREVIEW & DOWNLOAD ---
     st.markdown(f"### Condition: `{back_title}`")
-    st.subheader("Back Scatter Distributions (Overlayed, Normalized to Peak)")
+    st.subheader("Back Scatter Distributions (Overlayed)")
     back_fig, back_csv_files = get_overlay_plot_and_csvs("back", back_title, bs_x_min, bs_x_max)
     if back_fig:
         st.pyplot(back_fig)
@@ -167,7 +144,7 @@ if dls_file:
 
     # --- MADLS PREVIEW & DOWNLOAD ---
     st.markdown(f"### Condition: `{madls_title}`")
-    st.subheader("MADLS Distributions (Overlayed, Normalized to Peak)")
+    st.subheader("MADLS Distributions (Overlayed)")
     madls_fig, madls_csv_files = get_overlay_plot_and_csvs("madls", madls_title, madls_x_min, madls_x_max)
     if madls_fig:
         st.pyplot(madls_fig)
