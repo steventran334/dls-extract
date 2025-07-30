@@ -26,16 +26,22 @@ st.image("dls_example.png", caption="Example DLS spreadsheet format", use_contai
 dls_file = st.file_uploader("Upload DLS Excel file", type=["xlsx"])
 sheet_selected = None
 
-def find_col(dls, type_main, weight):
-    # Require "back scatter" or "madls" in the column name for specificity
-    for col in dls.columns:
+def get_block_cols(dls, block):
+    # block: "back" or "madls"
+    if block == "back":
+        # Back scatter is always columns 0–5
+        return dls.columns[:6]
+    elif block == "madls":
+        # MADLS is always columns 7–12 (skip the empty column 6)
+        return dls.columns[7:13]
+    else:
+        raise ValueError("block must be 'back' or 'madls'")
+
+def find_col_in_block(dls, block_cols, keyword):
+    for col in block_cols:
         col_str = ' '.join(str(c).lower() for c in col)
-        if type_main == "back":
-            if "back scatter" in col_str and weight in col_str:
-                return col
-        elif type_main == "madls":
-            if "madls" in col_str and weight in col_str:
-                return col
+        if keyword in col_str:
+            return col
     return None
 
 if dls_file:
@@ -75,17 +81,18 @@ if dls_file:
             key="madls_title"
         )
 
-    def get_overlay_plot_and_csvs(main_type, title_prefix, x_min, x_max):
+    def get_overlay_plot_and_csvs(block, title_prefix, x_min, x_max):
         weights = ["intensity", "number", "volume"]
         colors = ["black", "red", "blue"]
         labels = ["Intensity", "Number", "Volume"]
         csv_files = []
         fig, ax = plt.subplots(figsize=(7, 5))
+        block_cols = get_block_cols(dls, block)
         for weight, color, label in zip(weights, colors, labels):
-            size_col = find_col(dls, main_type, "size")
-            dist_col = find_col(dls, main_type, weight)
+            size_col = find_col_in_block(dls, block_cols, "size")
+            dist_col = find_col_in_block(dls, block_cols, weight)
             if size_col is None or dist_col is None:
-                st.warning(f"Could not find {weight} column for {main_type}.")
+                st.warning(f"Could not find {weight} column for {block}.")
                 continue
             x = dls[size_col].astype(float).values
             y = dls[dist_col].astype(float).values
