@@ -85,7 +85,9 @@ if dls_file:
             y = dls[dist_col].astype(float).values
             msk = ~np.isnan(x) & ~np.isnan(y)
             x, y = x[msk], y[msk]
-            y_norm = y / np.max(y) if np.max(y) > 0 else y
+            # Use the true maximum for normalization
+            max_y = y.max()
+            y_norm = y / max_y if max_y > 0 else y
 
             # CSV Output
             df_csv = pd.DataFrame({
