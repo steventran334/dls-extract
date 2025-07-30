@@ -125,6 +125,35 @@ if dls_file:
         plt.tight_layout()
         return fig, csv_files
 
+    def get_overlay_plot_and_csvs_raw(block, title_prefix, x_min, x_max):
+        weights = ["intensity", "number", "volume"]
+        colors = ["black", "red", "blue"]
+        labels = ["Intensity", "Number", "Volume"]
+        fig, ax = plt.subplots(figsize=(7, 5))
+        block_cols = get_block_cols(dls, block)
+        for weight, color, label in zip(weights, colors, labels):
+            size_col = find_col_in_block(dls, block_cols, "size")
+            dist_col = find_col_in_block(dls, block_cols, weight)
+            if size_col is None or dist_col is None:
+                st.warning(f"Could not find {weight} column for {block}.")
+                continue
+            x = dls[size_col].astype(float).values
+            y = dls[dist_col].astype(float).values
+            msk = ~np.isnan(x) & ~np.isnan(y)
+            x, y = x[msk], y[msk]
+            ax.plot(x, y, label=label, color=color, lw=2)
+        ax.set_xlim([x_min, x_max])
+        n_ticks = 6
+        xticks = np.linspace(x_min, x_max, n_ticks)
+        ax.set_xticks(xticks)
+        ax.set_xticklabels([str(int(t)) for t in xticks])
+        ax.set_xlabel("Diameter (nm)")
+        ax.set_ylabel("% (raw)")
+        ax.set_title(title_prefix + " (Raw Data)")
+        ax.legend()
+        plt.tight_layout()
+        return fig
+
     def make_zip(name_pairs):
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w") as zf:
@@ -134,7 +163,7 @@ if dls_file:
 
     # --- BACK SCATTER PREVIEW & DOWNLOAD ---
     st.markdown(f"### Condition: `{back_title}`")
-    st.subheader("Back Scatter Distributions (Overlayed)")
+    st.subheader("Back Scatter Distributions (Overlayed, Normalized)")
     back_fig, back_csv_files = get_overlay_plot_and_csvs("back", back_title, bs_x_min, bs_x_max)
     if back_fig:
         st.pyplot(back_fig)
@@ -154,9 +183,24 @@ if dls_file:
             mime="application/zip"
         )
 
+    # --- BACK SCATTER RAW PLOT ---
+    st.subheader("Back Scatter Distributions (Overlayed, Raw Data)")
+    back_fig_raw = get_overlay_plot_and_csvs_raw("back", back_title, bs_x_min, bs_x_max)
+    if back_fig_raw:
+        st.pyplot(back_fig_raw)
+        svg_buf_raw = io.StringIO()
+        back_fig_raw.savefig(svg_buf_raw, format="svg", bbox_inches='tight')
+        st.download_button(
+            label="Download Back Scatter Overlay (Raw, SVG)",
+            data=svg_buf_raw.getvalue(),
+            file_name=f"{back_title}_BackScatter_Overlay_RAW.svg",
+            mime="image/svg+xml"
+        )
+        plt.close(back_fig_raw)
+
     # --- MADLS PREVIEW & DOWNLOAD ---
     st.markdown(f"### Condition: `{madls_title}`")
-    st.subheader("MADLS Distributions (Overlayed)")
+    st.subheader("MADLS Distributions (Overlayed, Normalized)")
     madls_fig, madls_csv_files = get_overlay_plot_and_csvs("madls", madls_title, madls_x_min, madls_x_max)
     if madls_fig:
         st.pyplot(madls_fig)
@@ -175,6 +219,21 @@ if dls_file:
             file_name=f"{madls_title}_MADLS_CSVs.zip",
             mime="application/zip"
         )
+
+    # --- MADLS RAW PLOT ---
+    st.subheader("MADLS Distributions (Overlayed, Raw Data)")
+    madls_fig_raw = get_overlay_plot_and_csvs_raw("madls", madls_title, madls_x_min, madls_x_max)
+    if madls_fig_raw:
+        st.pyplot(madls_fig_raw)
+        svg_buf_raw = io.StringIO()
+        madls_fig_raw.savefig(svg_buf_raw, format="svg", bbox_inches='tight')
+        st.download_button(
+            label="Download MADLS Overlay (Raw, SVG)",
+            data=svg_buf_raw.getvalue(),
+            file_name=f"{madls_title}_MADLS_Overlay_RAW.svg",
+            mime="image/svg+xml"
+        )
+        plt.close(madls_fig_raw)
 
 else:
     st.info("Upload a DLS Excel file and select a condition (sheet) to view plots and downloads.")
