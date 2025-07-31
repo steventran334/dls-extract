@@ -120,7 +120,7 @@ if dls_file:
         ax.set_xticklabels([str(int(t)) for t in xticks])
         ax.set_xlabel("Diameter (nm)")
         ax.set_ylabel("% (normalized)")
-        ax.set_title(title_prefix)
+        ax.set_title(title_prefix + " (Normalized)")
         ax.legend()
         plt.tight_layout()
         return fig, csv_files
