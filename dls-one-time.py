@@ -66,31 +66,37 @@ if dls_file:
         madls_x_min = st.number_input("MADLS Min (nm)", min_value=0, max_value=5000, value=0, step=10, key="madls_xmin")
         madls_x_max = st.number_input("MADLS Max (nm)", min_value=0, max_value=5000, value=1000, step=10, key="madls_xmax")
 
-    # ---------------- Editable titles ----------------
+    # --- Editable titles for each plot group ---
     st.subheader("Custom Titles (Optional)")
-
-    # Detect sheet change and reset widget states
+    
+    # Detect and reset when sheet changes
     if "last_sheet" not in st.session_state:
         st.session_state.last_sheet = None
-
+    
+    # If user switches sheet, reset default titles to the sheet name
     if st.session_state.last_sheet != sheet_selected:
-        # reset defaults and force rerun so widgets refresh
-        st.session_state.back_title_default = sheet_selected
-        st.session_state.madls_title_default = sheet_selected
         st.session_state.last_sheet = sheet_selected
-        st.rerun()
-
-    # Get current default titles (preserve edits)
-    back_title_default = st.session_state.get("back_title_default", sheet_selected)
-    madls_title_default = st.session_state.get("madls_title_default", sheet_selected)
-
+        st.session_state.back_title = sheet_selected
+        st.session_state.madls_title = sheet_selected
+    
+    # Use dynamic keys that depend on sheet name
     col3, col4 = st.columns(2)
     with col3:
-        back_title = st.text_input("Back Scatter Plot Title", value=back_title_default, key="back_title_input")
-        st.session_state.back_title_default = back_title
+        back_title = st.text_input(
+            "Back Scatter Plot Title",
+            value=st.session_state.get("back_title", sheet_selected),
+            key=f"back_title_input_{sheet_selected}"  # <-- dynamic key
+        )
+        st.session_state.back_title = back_title
+    
     with col4:
-        madls_title = st.text_input("MADLS Plot Title", value=madls_title_default, key="madls_title_input")
-        st.session_state.madls_title_default = madls_title
+        madls_title = st.text_input(
+            "MADLS Plot Title",
+            value=st.session_state.get("madls_title", sheet_selected),
+            key=f"madls_title_input_{sheet_selected}"  # <-- dynamic key
+        )
+        st.session_state.madls_title = madls_title
+
 
     # ---------------- Plot functions ----------------
     def get_overlay_plot_and_csvs(block, title_prefix, x_min, x_max):
