@@ -26,33 +26,40 @@ st.image("dls_example.png", caption="Example DLS spreadsheet format", use_contai
 dls_file = st.file_uploader("Upload DLS Excel file", type=["xlsx"])
 sheet_selected = None
 
+
+# --------------------------------------------------------------------
+# Helper functions
+# --------------------------------------------------------------------
 def get_block_cols(dls, block):
-    # block: "back" or "madls"
+    """Return the column block for back scatter or MADLS."""
     if block == "back":
-        # Back scatter is always columns 0–5
         return dls.columns[:6]
     elif block == "madls":
-        # MADLS is always columns 7–12 (skip the empty column 6)
         return dls.columns[7:13]
     else:
         raise ValueError("block must be 'back' or 'madls'")
 
+
 def find_col_in_block(dls, block_cols, keyword):
+    """Find a column in the block that contains a keyword."""
     for col in block_cols:
         col_str = ' '.join(str(c).lower() for c in col)
         if keyword in col_str:
             return col
     return None
 
+
+# --------------------------------------------------------------------
+# Main app
+# --------------------------------------------------------------------
 if dls_file:
     xls = pd.ExcelFile(dls_file)
     sheets = xls.sheet_names
     sheet_selected = st.selectbox("Select DLS condition (sheet)", sheets)
-    dls = pd.read_excel(xls, sheet_name=sheet_selected, header=[0,1,2], skiprows=[0,1])
+    dls = pd.read_excel(xls, sheet_name=sheet_selected, header=[0, 1, 2], skiprows=[0, 1])
 
     # --- X-Axis Range Numeric Inputs ---
     st.subheader("X-Axis Ranges (Diameter in nm)")
-
     col1, col2 = st.columns(2)
 
     with col1:
@@ -65,22 +72,38 @@ if dls_file:
         madls_x_min = st.number_input("MADLS Min (nm)", min_value=0, max_value=5000, value=0, step=10, key="madls_xmin")
         madls_x_max = st.number_input("MADLS Max (nm)", min_value=0, max_value=5000, value=1000, step=10, key="madls_xmax")
 
-    # --- Editable titles for each plot group ---
+    # ----------------------------------------------------------------
+    # Editable titles for each plot group (auto-reset when sheet changes)
+    # ----------------------------------------------------------------
     st.subheader("Custom Titles (Optional)")
+
+    if "last_sheet" not in st.session_state:
+        st.session_state.last_sheet = None
+    if st.session_state.last_sheet != sheet_selected:
+        st.session_state.back_title = sheet_selected
+        st.session_state.madls_title = sheet_selected
+        st.session_state.last_sheet = sheet_selected
+
     col3, col4 = st.columns(2)
     with col3:
         back_title = st.text_input(
             "Back Scatter Plot Title",
-            value=sheet_selected,
-            key="back_title"
+            value=st.session_state.get("back_title", sheet_selected),
+            key="back_title_input"
         )
+        st.session_state.back_title = back_title
+
     with col4:
         madls_title = st.text_input(
             "MADLS Plot Title",
-            value=sheet_selected,
-            key="madls_title"
+            value=st.session_state.get("madls_title", sheet_selected),
+            key="madls_title_input"
         )
+        st.session_state.madls_title = madls_title
 
+    # ----------------------------------------------------------------
+    # Plot generation functions
+    # ----------------------------------------------------------------
     def get_overlay_plot_and_csvs(block, title_prefix, x_min, x_max):
         weights = ["intensity", "number", "volume"]
         colors = ["black", "red", "blue"]
@@ -88,6 +111,7 @@ if dls_file:
         csv_files = []
         fig, ax = plt.subplots(figsize=(7, 5))
         block_cols = get_block_cols(dls, block)
+
         for weight, color, label in zip(weights, colors, labels):
             size_col = find_col_in_block(dls, block_cols, "size")
             dist_col = find_col_in_block(dls, block_cols, weight)
@@ -107,7 +131,7 @@ if dls_file:
                 f"DLS {weight.capitalize()} (%)": y,
                 f"DLS {weight.capitalize()} (normalized by max)": y_norm
             })
-            fname_base = f"{sheet_selected}_{title_prefix}_{label}"
+            fname_base = f"{title_prefix}_{block}_{label}"
             csv_files.append((f"{fname_base}.csv", df_csv.to_csv(index=False)))
 
             # Overlay plot
@@ -124,6 +148,7 @@ if dls_file:
         ax.legend()
         plt.tight_layout()
         return fig, csv_files
+
 
     def get_overlay_plot_and_csvs_raw(block, title_prefix, x_min, x_max):
         weights = ["intensity", "number", "volume"]
@@ -154,6 +179,7 @@ if dls_file:
         plt.tight_layout()
         return fig
 
+
     def make_zip(name_pairs):
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w") as zf:
@@ -161,7 +187,9 @@ if dls_file:
                 zf.writestr(fname, data)
         return zip_buffer.getvalue()
 
-    # --- BACK SCATTER PREVIEW & DOWNLOAD ---
+    # ----------------------------------------------------------------
+    # BACK SCATTER PREVIEW & DOWNLOAD
+    # ----------------------------------------------------------------
     st.markdown(f"### Condition: `{back_title}`")
     st.subheader("Back Scatter Distributions (Overlayed, Normalized)")
     back_fig, back_csv_files = get_overlay_plot_and_csvs("back", back_title, bs_x_min, bs_x_max)
@@ -198,7 +226,9 @@ if dls_file:
         )
         plt.close(back_fig_raw)
 
-    # --- MADLS PREVIEW & DOWNLOAD ---
+    # ----------------------------------------------------------------
+    # MADLS PREVIEW & DOWNLOAD
+    # ----------------------------------------------------------------
     st.markdown(f"### Condition: `{madls_title}`")
     st.subheader("MADLS Distributions (Overlayed, Normalized)")
     madls_fig, madls_csv_files = get_overlay_plot_and_csvs("madls", madls_title, madls_x_min, madls_x_max)
