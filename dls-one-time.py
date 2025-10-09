@@ -27,11 +27,8 @@ dls_file = st.file_uploader("Upload DLS Excel file", type=["xlsx"])
 sheet_selected = None
 
 
-# --------------------------------------------------------------------
-# Helper functions
-# --------------------------------------------------------------------
+# ---------------- Helper functions ----------------
 def get_block_cols(dls, block):
-    """Return the column block for back scatter or MADLS."""
     if block == "back":
         return dls.columns[:6]
     elif block == "madls":
@@ -41,7 +38,6 @@ def get_block_cols(dls, block):
 
 
 def find_col_in_block(dls, block_cols, keyword):
-    """Find a column in the block that contains a keyword."""
     for col in block_cols:
         col_str = ' '.join(str(c).lower() for c in col)
         if keyword in col_str:
@@ -49,16 +45,14 @@ def find_col_in_block(dls, block_cols, keyword):
     return None
 
 
-# --------------------------------------------------------------------
-# Main app
-# --------------------------------------------------------------------
+# ---------------- Main app ----------------
 if dls_file:
     xls = pd.ExcelFile(dls_file)
     sheets = xls.sheet_names
     sheet_selected = st.selectbox("Select DLS condition (sheet)", sheets)
     dls = pd.read_excel(xls, sheet_name=sheet_selected, header=[0, 1, 2], skiprows=[0, 1])
 
-    # --- X-Axis Range Numeric Inputs ---
+    # ---------------- X-axis inputs ----------------
     st.subheader("X-Axis Ranges (Diameter in nm)")
     col1, col2 = st.columns(2)
 
@@ -72,38 +66,33 @@ if dls_file:
         madls_x_min = st.number_input("MADLS Min (nm)", min_value=0, max_value=5000, value=0, step=10, key="madls_xmin")
         madls_x_max = st.number_input("MADLS Max (nm)", min_value=0, max_value=5000, value=1000, step=10, key="madls_xmax")
 
-    # ----------------------------------------------------------------
-    # Editable titles for each plot group (auto-reset when sheet changes)
-    # ----------------------------------------------------------------
+    # ---------------- Editable titles ----------------
     st.subheader("Custom Titles (Optional)")
 
+    # Detect sheet change and reset widget states
     if "last_sheet" not in st.session_state:
         st.session_state.last_sheet = None
+
     if st.session_state.last_sheet != sheet_selected:
-        st.session_state.back_title = sheet_selected
-        st.session_state.madls_title = sheet_selected
+        # reset defaults and force rerun so widgets refresh
+        st.session_state.back_title_default = sheet_selected
+        st.session_state.madls_title_default = sheet_selected
         st.session_state.last_sheet = sheet_selected
+        st.rerun()
+
+    # Get current default titles (preserve edits)
+    back_title_default = st.session_state.get("back_title_default", sheet_selected)
+    madls_title_default = st.session_state.get("madls_title_default", sheet_selected)
 
     col3, col4 = st.columns(2)
     with col3:
-        back_title = st.text_input(
-            "Back Scatter Plot Title",
-            value=st.session_state.get("back_title", sheet_selected),
-            key="back_title_input"
-        )
-        st.session_state.back_title = back_title
-
+        back_title = st.text_input("Back Scatter Plot Title", value=back_title_default, key="back_title_input")
+        st.session_state.back_title_default = back_title
     with col4:
-        madls_title = st.text_input(
-            "MADLS Plot Title",
-            value=st.session_state.get("madls_title", sheet_selected),
-            key="madls_title_input"
-        )
-        st.session_state.madls_title = madls_title
+        madls_title = st.text_input("MADLS Plot Title", value=madls_title_default, key="madls_title_input")
+        st.session_state.madls_title_default = madls_title
 
-    # ----------------------------------------------------------------
-    # Plot generation functions
-    # ----------------------------------------------------------------
+    # ---------------- Plot functions ----------------
     def get_overlay_plot_and_csvs(block, title_prefix, x_min, x_max):
         weights = ["intensity", "number", "volume"]
         colors = ["black", "red", "blue"]
@@ -125,7 +114,6 @@ if dls_file:
             max_y = y.max()
             y_norm = y / max_y if max_y > 0 else y
 
-            # CSV Output
             df_csv = pd.DataFrame({
                 "DLS Diameter (nm)": x,
                 f"DLS {weight.capitalize()} (%)": y,
@@ -133,13 +121,10 @@ if dls_file:
             })
             fname_base = f"{title_prefix}_{block}_{label}"
             csv_files.append((f"{fname_base}.csv", df_csv.to_csv(index=False)))
-
-            # Overlay plot
             ax.plot(x, y_norm, label=label, color=color, lw=2)
 
         ax.set_xlim([x_min, x_max])
-        n_ticks = 6
-        xticks = np.linspace(x_min, x_max, n_ticks)
+        xticks = np.linspace(x_min, x_max, 6)
         ax.set_xticks(xticks)
         ax.set_xticklabels([str(int(t)) for t in xticks])
         ax.set_xlabel("Diameter (nm)")
@@ -168,8 +153,7 @@ if dls_file:
             x, y = x[msk], y[msk]
             ax.plot(x, y, label=label, color=color, lw=2)
         ax.set_xlim([x_min, x_max])
-        n_ticks = 6
-        xticks = np.linspace(x_min, x_max, n_ticks)
+        xticks = np.linspace(x_min, x_max, 6)
         ax.set_xticks(xticks)
         ax.set_xticklabels([str(int(t)) for t in xticks])
         ax.set_xlabel("Diameter (nm)")
@@ -187,9 +171,7 @@ if dls_file:
                 zf.writestr(fname, data)
         return zip_buffer.getvalue()
 
-    # ----------------------------------------------------------------
-    # BACK SCATTER PREVIEW & DOWNLOAD
-    # ----------------------------------------------------------------
+    # ---------------- Back scatter section ----------------
     st.markdown(f"### Condition: `{back_title}`")
     st.subheader("Back Scatter Distributions (Overlayed, Normalized)")
     back_fig, back_csv_files = get_overlay_plot_and_csvs("back", back_title, bs_x_min, bs_x_max)
@@ -197,38 +179,29 @@ if dls_file:
         st.pyplot(back_fig)
         svg_buf = io.StringIO()
         back_fig.savefig(svg_buf, format="svg", bbox_inches='tight')
-        st.download_button(
-            label="Download Back Scatter Overlay (SVG)",
-            data=svg_buf.getvalue(),
-            file_name=f"{back_title}_BackScatter_Overlay.svg",
-            mime="image/svg+xml"
-        )
+        st.download_button("Download Back Scatter Overlay (SVG)",
+                           data=svg_buf.getvalue(),
+                           file_name=f"{back_title}_BackScatter_Overlay.svg",
+                           mime="image/svg+xml")
         plt.close(back_fig)
-        st.download_button(
-            label="Download All Back Scatter CSVs (ZIP)",
-            data=make_zip(back_csv_files),
-            file_name=f"{back_title}_BackScatter_CSVs.zip",
-            mime="application/zip"
-        )
+        st.download_button("Download All Back Scatter CSVs (ZIP)",
+                           data=make_zip(back_csv_files),
+                           file_name=f"{back_title}_BackScatter_CSVs.zip",
+                           mime="application/zip")
 
-    # --- BACK SCATTER RAW PLOT ---
     st.subheader("Back Scatter Distributions (Overlayed, Raw Data)")
     back_fig_raw = get_overlay_plot_and_csvs_raw("back", back_title, bs_x_min, bs_x_max)
     if back_fig_raw:
         st.pyplot(back_fig_raw)
         svg_buf_raw = io.StringIO()
         back_fig_raw.savefig(svg_buf_raw, format="svg", bbox_inches='tight')
-        st.download_button(
-            label="Download Back Scatter Overlay (Raw, SVG)",
-            data=svg_buf_raw.getvalue(),
-            file_name=f"{back_title}_BackScatter_Overlay_RAW.svg",
-            mime="image/svg+xml"
-        )
+        st.download_button("Download Back Scatter Overlay (Raw, SVG)",
+                           data=svg_buf_raw.getvalue(),
+                           file_name=f"{back_title}_BackScatter_Overlay_RAW.svg",
+                           mime="image/svg+xml")
         plt.close(back_fig_raw)
 
-    # ----------------------------------------------------------------
-    # MADLS PREVIEW & DOWNLOAD
-    # ----------------------------------------------------------------
+    # ---------------- MADLS section ----------------
     st.markdown(f"### Condition: `{madls_title}`")
     st.subheader("MADLS Distributions (Overlayed, Normalized)")
     madls_fig, madls_csv_files = get_overlay_plot_and_csvs("madls", madls_title, madls_x_min, madls_x_max)
@@ -236,33 +209,26 @@ if dls_file:
         st.pyplot(madls_fig)
         svg_buf = io.StringIO()
         madls_fig.savefig(svg_buf, format="svg", bbox_inches='tight')
-        st.download_button(
-            label="Download MADLS Overlay (SVG)",
-            data=svg_buf.getvalue(),
-            file_name=f"{madls_title}_MADLS_Overlay.svg",
-            mime="image/svg+xml"
-        )
+        st.download_button("Download MADLS Overlay (SVG)",
+                           data=svg_buf.getvalue(),
+                           file_name=f"{madls_title}_MADLS_Overlay.svg",
+                           mime="image/svg+xml")
         plt.close(madls_fig)
-        st.download_button(
-            label="Download All MADLS CSVs (ZIP)",
-            data=make_zip(madls_csv_files),
-            file_name=f"{madls_title}_MADLS_CSVs.zip",
-            mime="application/zip"
-        )
+        st.download_button("Download All MADLS CSVs (ZIP)",
+                           data=make_zip(madls_csv_files),
+                           file_name=f"{madls_title}_MADLS_CSVs.zip",
+                           mime="application/zip")
 
-    # --- MADLS RAW PLOT ---
     st.subheader("MADLS Distributions (Overlayed, Raw Data)")
     madls_fig_raw = get_overlay_plot_and_csvs_raw("madls", madls_title, madls_x_min, madls_x_max)
     if madls_fig_raw:
         st.pyplot(madls_fig_raw)
         svg_buf_raw = io.StringIO()
         madls_fig_raw.savefig(svg_buf_raw, format="svg", bbox_inches='tight')
-        st.download_button(
-            label="Download MADLS Overlay (Raw, SVG)",
-            data=svg_buf_raw.getvalue(),
-            file_name=f"{madls_title}_MADLS_Overlay_RAW.svg",
-            mime="image/svg+xml"
-        )
+        st.download_button("Download MADLS Overlay (Raw, SVG)",
+                           data=svg_buf_raw.getvalue(),
+                           file_name=f"{madls_title}_MADLS_Overlay_RAW.svg",
+                           mime="image/svg+xml")
         plt.close(madls_fig_raw)
 
 else:
