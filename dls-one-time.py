@@ -58,13 +58,13 @@ if dls_file:
 
     with col1:
         st.markdown("**Back Scatter X-Axis Limits**")
-        bs_x_min = st.number_input("Back Scatter Min (nm)", min_value=0, max_value=5000, value=0, step=10, key="bs_xmin")
-        bs_x_max = st.number_input("Back Scatter Max (nm)", min_value=0, max_value=5000, value=1000, step=10, key="bs_xmax")
+        bs_x_min = st.number_input("Back Scatter Min (nm)", min_value=0, max_value=10000, value=0, step=10, key="bs_xmin")
+        bs_x_max = st.number_input("Back Scatter Max (nm)", min_value=0, max_value=10000, value=1000, step=10, key="bs_xmax")
 
     with col2:
         st.markdown("**MADLS X-Axis Limits**")
-        madls_x_min = st.number_input("MADLS Min (nm)", min_value=0, max_value=5000, value=0, step=10, key="madls_xmin")
-        madls_x_max = st.number_input("MADLS Max (nm)", min_value=0, max_value=5000, value=1000, step=10, key="madls_xmax")
+        madls_x_min = st.number_input("MADLS Min (nm)", min_value=0, max_value=10000, value=0, step=10, key="madls_xmin")
+        madls_x_max = st.number_input("MADLS Max (nm)", min_value=0, max_value=10000, value=1000, step=10, key="madls_xmax")
 
     # --- Editable titles for each plot group ---
     st.subheader("Custom Titles (Optional)")
