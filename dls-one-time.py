@@ -66,13 +66,12 @@ if dls_file:
 
         # Storage for ZIP files
         all_csvs = []
-
+        
         def plot_multi_conditions(block, weight_name, x_limit, normalized=True):
             fig, ax = plt.subplots(figsize=(10, 6))
             weight_key = weight_name.lower()
             
             for sheet in selected_sheets:
-                # Read data
                 df = pd.read_excel(xls, sheet_name=sheet, header=[0, 1, 2], skiprows=[0, 1])
                 block_cols = get_block_cols(df, block)
                 
@@ -91,16 +90,17 @@ if dls_file:
                     
                     ax.plot(x, y, label=f"{sheet}", lw=2)
                     
-                    # Prepare CSV data for later ZIP
                     df_csv = pd.DataFrame({"Diameter (nm)": x, f"{weight_name} (%)": y})
                     all_csvs.append((f"{sheet}_{block}_{weight_name}_{'norm' if normalized else 'raw'}.csv", df_csv.to_csv(index=False)))
-                else:
-                    st.error(f"Data columns not found in sheet: {sheet}")
-
+        
             ax.set_xlim([0, x_limit])
             ax.set_xlabel("Diameter (nm)")
             ax.set_ylabel("% (Normalized)" if normalized else "% (Raw)")
-            ax.set_title(f"{block.upper()} - {weight_name} Overlay")
+            
+            # Updated Title Logic
+            display_name = "Back Scatter" if block == "back" else "MADLS"
+            ax.set_title(f"{display_name} - {weight_name} Overlay")
+            
             ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
             plt.tight_layout()
             return fig
