@@ -94,6 +94,7 @@ if dls_file:
                     all_csvs.append((f"{sheet}_{block}_{weight_name}_{'norm' if normalized else 'raw'}.csv", df_csv.to_csv(index=False)))
         
             ax.set_xlim([0, x_limit])
+            ax.set_ylim(0, top_limit)
             ax.set_xlabel("Diameter (nm)")
             ax.set_ylabel("% (Normalized)" if normalized else "% (Raw)")
             
