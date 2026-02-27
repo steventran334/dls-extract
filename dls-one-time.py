@@ -64,18 +64,17 @@ if dls_file:
         with c3:
             madls_x_max = st.number_input("MADLS Max (nm)", value=1000, step=100)
 
-        # Storage for ZIP files
+        # Storage for CSVs to zip later
         all_csvs = []
         
-def plot_multi_conditions(block, weight_name, x_limit, normalized=True):
+        def plot_multi_conditions(block, weight_name, x_limit, normalized=True):
             fig, ax = plt.subplots(figsize=(10, 6))
             weight_key = weight_name.lower()
             
-            # --- NEW: Initialize max y to adjust top limit dynamically later ---
-            global_max_y = 0 
-
+            # We track the maximum Y value found across all sheets to set the top limit dynamically
+            global_max_y = 0
+            
             for sheet in selected_sheets:
-                # (Reading logic remains the same)
                 df = pd.read_excel(xls, sheet_name=sheet, header=[0, 1, 2], skiprows=[0, 1])
                 block_cols = get_block_cols(df, block)
                 
@@ -83,37 +82,39 @@ def plot_multi_conditions(block, weight_name, x_limit, normalized=True):
                 dist_col = find_col_in_block(block_cols, weight_key)
                 
                 if size_col is not None and dist_col is not None:
-                    # Coerce to numeric, errors='coerce' handles non-numeric/missing gracefully
+                    # Convert to numeric, forcing errors to NaN to be safe
                     x = pd.to_numeric(df[size_col], errors='coerce').values
                     y = pd.to_numeric(df[dist_col], errors='coerce').values
                     
                     msk = ~np.isnan(x) & ~np.isnan(y)
                     x, y = x[msk], y[msk]
                     
-                    if len(x) > 0: # Check if data exists after filtering
+                    if len(x) > 0:
                         if normalized:
-                            max_y = y.max()
-                            if max_y > 0:
-                                y = y / max_y
+                            max_val = y.max()
+                            if max_val > 0:
+                                y = y / max_val
                         
-                        # Track global max for plot limits
+                        # Update global max for axis scaling later
                         current_max = y.max() if len(y) > 0 else 0
                         if current_max > global_max_y:
                             global_max_y = current_max
 
                         ax.plot(x, y, label=f"{sheet}", lw=2)
                         
-                        # Prepare CSV data
+                        # Save data for CSV export
                         df_csv = pd.DataFrame({"Diameter (nm)": x, f"{weight_name} (%)": y})
                         all_csvs.append((f"{sheet}_{block}_{weight_name}_{'norm' if normalized else 'raw'}.csv", df_csv.to_csv(index=False)))
         
             # --- Axis Formatting ---
             ax.set_xlim([0, x_limit])
             
-            # *** THE FIX: Force Y-axis to start at 0 ***
+            # *** FIX: Force Y-axis to start at 0 ***
             # We add a small buffer (1.05) to the top so the peak doesn't hit the ceiling
-            top_limit = 1.05 if normalized else (global_max_y * 1.05)
-            ax.set_ylim(0, top_limit) 
+            if normalized:
+                ax.set_ylim(0, 1.05)
+            else:
+                ax.set_ylim(0, global_max_y * 1.05 if global_max_y > 0 else 1.0)
 
             ax.set_xlabel("Diameter (nm)")
             ax.set_ylabel("% (Normalized)" if normalized else "% (Raw)")
@@ -121,9 +122,11 @@ def plot_multi_conditions(block, weight_name, x_limit, normalized=True):
             display_name = "Back Scatter" if block == "back" else "MADLS"
             ax.set_title(f"{display_name} - {weight_name} Overlay")
             
+            # Move legend outside to keep graph clean
             ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
             plt.tight_layout()
             return fig
+
         # Display Sections
         col_bs, col_madls = st.columns(2)
 
