@@ -21,6 +21,21 @@ Select multiple conditions to overlay them on the same graph.
 
 dls_file = st.file_uploader("Upload DLS Excel file", type=["xlsx"])
 
+# ---------------- Color Definitions ----------------
+COLOR_OPTIONS = {
+    "Blue": "#0000FF",
+    "Green": "#008000",
+    "Red": "#FF0000",
+    "Orange": "#FFA500",
+    "Purple": "#800080",
+    "Cyan": "#00FFFF",
+    "Magenta": "#FF00FF",
+    "Black": "#000000",
+    "Grey": "#808080",
+    "Gold": "#FFD700"
+}
+COLOR_NAMES = list(COLOR_OPTIONS.keys())
+
 # ---------------- Helper functions ----------------
 def get_block_cols(df, block):
     if block == "back":
@@ -54,6 +69,17 @@ if dls_file:
     if not selected_sheets:
         st.warning("Please select at least one condition.")
     else:
+        # --- Sidebar Color Customization ---
+        st.sidebar.header("🎨 Color Customization")
+        st.sidebar.info("Default cycle: Blue, Green, Red, Orange, Purple")
+        
+        sheet_colors = {}
+        for i, sheet in enumerate(selected_sheets):
+            # Default to the requested cycle for the first 5, then loop through others
+            default_color_index = i % 5 
+            choice = st.sidebar.selectbox(f"Color for {sheet}", COLOR_NAMES, index=default_color_index, key=f"color_{sheet}")
+            sheet_colors[sheet] = COLOR_OPTIONS[choice]
+
         # X-Axis Global Controls
         st.subheader("Axis Settings")
         c1, c2, c3 = st.columns(3)
@@ -70,11 +96,12 @@ if dls_file:
         def plot_multi_conditions(block, weight_name, x_limit, normalized=True):
             fig, ax = plt.subplots(figsize=(10, 6))
             weight_key = weight_name.lower()
-            
-            # We track the maximum Y value found across all sheets to set the top limit dynamically
             global_max_y = 0
             
             for sheet in selected_sheets:
+                # Assign selected color
+                current_color = sheet_colors.get(sheet, "#000000")
+                
                 df = pd.read_excel(xls, sheet_name=sheet, header=[0, 1, 2], skiprows=[0, 1])
                 block_cols = get_block_cols(df, block)
                 
@@ -82,7 +109,6 @@ if dls_file:
                 dist_col = find_col_in_block(block_cols, weight_key)
                 
                 if size_col is not None and dist_col is not None:
-                    # Convert to numeric, forcing errors to NaN to be safe
                     x = pd.to_numeric(df[size_col], errors='coerce').values
                     y = pd.to_numeric(df[dist_col], errors='coerce').values
                     
@@ -95,22 +121,17 @@ if dls_file:
                             if max_val > 0:
                                 y = y / max_val
                         
-                        # Update global max for axis scaling later
                         current_max = y.max() if len(y) > 0 else 0
                         if current_max > global_max_y:
                             global_max_y = current_max
 
-                        ax.plot(x, y, label=f"{sheet}", lw=2)
+                        # Plot with customized color
+                        ax.plot(x, y, label=f"{sheet}", lw=2, color=current_color)
                         
-                        # Save data for CSV export
                         df_csv = pd.DataFrame({"Diameter (nm)": x, f"{weight_name} (%)": y})
                         all_csvs.append((f"{sheet}_{block}_{weight_name}_{'norm' if normalized else 'raw'}.csv", df_csv.to_csv(index=False)))
         
-            # --- Axis Formatting ---
             ax.set_xlim([0, x_limit])
-            
-            # *** FIX: Force Y-axis to start at 0 ***
-            # We add a small buffer (1.05) to the top so the peak doesn't hit the ceiling
             if normalized:
                 ax.set_ylim(0, 1.05)
             else:
@@ -122,7 +143,6 @@ if dls_file:
             display_name = "Back Scatter" if block == "back" else "MADLS"
             ax.set_title(f"{display_name} - {weight_name} Overlay")
             
-            # Move legend outside to keep graph clean
             ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
             plt.tight_layout()
             return fig
@@ -135,7 +155,7 @@ if dls_file:
             fig_bs = plot_multi_conditions("back", weight_type, bs_x_max, normalized=True)
             st.pyplot(fig_bs)
             
-            buf_bs = io.StringIO()
+            buf_bs = io.BytesIO()
             fig_bs.savefig(buf_bs, format="svg")
             st.download_button("Download BS SVG", buf_bs.getvalue(), "back_scatter_overlay.svg", "image/svg+xml")
 
@@ -144,7 +164,7 @@ if dls_file:
             fig_ma = plot_multi_conditions("madls", weight_type, madls_x_max, normalized=True)
             st.pyplot(fig_ma)
             
-            buf_ma = io.StringIO()
+            buf_ma = io.BytesIO()
             fig_ma.savefig(buf_ma, format="svg")
             st.download_button("Download MADLS SVG", buf_ma.getvalue(), "madls_overlay.svg", "image/svg+xml")
 
