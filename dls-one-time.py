@@ -24,8 +24,8 @@ dls_file = st.file_uploader("Upload DLS Excel file", type=["xlsx"])
 # ---------------- Color Definitions ----------------
 COLOR_OPTIONS = {
     "Blue": "#0000FF",
-    "Green": "#008000",
     "Red": "#FF0000",
+    "Green": "#008000",
     "Orange": "#FFA500",
     "Purple": "#800080",
     "Cyan": "#00FFFF",
