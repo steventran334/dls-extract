@@ -148,8 +148,12 @@ if dls_file:
             ax.set_ylim(0, (1.05 if normalized else global_max_y * 1.05))
             ax.set_xlabel("Diameter (nm)")
             ax.set_ylabel("% (Normalized)" if normalized else "% (Raw)")
-            display_name = "Back Scatter" if block == "back" else "MADLS"
-            ax.set_title(f"{display_name} - Overlay")
+            
+            # --- UPDATED TITLE LOGIC ---
+            graph_type = "Back Scatter" if block == "back" else "MADLS"
+            weight_label = ", ".join(weight_names) if is_multi_weight else weight_names[0]
+            ax.set_title(f"{graph_type} - {weight_label}")
+            
             ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
             plt.tight_layout()
             return fig
