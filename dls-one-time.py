@@ -79,13 +79,11 @@ if dls_file:
         
         assigned_colors = {}
         if color_mode == "Color by Condition":
-            st.sidebar.info("Default cycle: Blue, Green, Red, Orange, Purple")
             for i, sheet in enumerate(selected_sheets):
-                default_ix = i % 5 
+                default_ix = i % len(COLOR_NAMES)
                 choice = st.sidebar.selectbox(f"Color for {sheet}", COLOR_NAMES, index=default_ix, key=f"color_{sheet}")
                 assigned_colors[sheet] = COLOR_OPTIONS[choice]
         else:
-            st.sidebar.info("Assign colors to weightings (Intensity, Number, Volume).")
             for i, weight in enumerate(["Intensity", "Number", "Volume"]):
                 choice = st.sidebar.selectbox(f"Color for {weight}", COLOR_NAMES, index=i, key=f"color_w_{weight}")
                 assigned_colors[weight] = COLOR_OPTIONS[choice]
@@ -107,15 +105,16 @@ if dls_file:
         def plot_multi_conditions(block, weight_names, x_limit, normalized=True, is_multi_weight=False):
             fig, ax = plt.subplots(figsize=(10, 6))
             global_max_y = 0
-            if isinstance(weight_names, str):
-                weight_names = [weight_names]
+            
+            # Ensure weight_names is a list for iteration
+            current_weights = [weight_names] if isinstance(weight_names, str) else weight_names
             
             for sheet in selected_sheets:
                 df = pd.read_excel(xls, sheet_name=sheet, header=[0, 1, 2], skiprows=[0, 1])
                 block_cols = get_block_cols(df, block)
                 size_col = find_col_in_block(block_cols, "size")
                 
-                for weight_name in weight_names:
+                for weight_name in current_weights:
                     weight_key = weight_name.lower()
                     dist_col = find_col_in_block(block_cols, weight_key)
                     
@@ -141,7 +140,6 @@ if dls_file:
                             
                             label = f"{sheet}" if not is_multi_weight else f"{sheet} ({weight_name})"
                             ax.plot(x, y, label=label, lw=2, color=current_color)
-                            
                             all_csvs.append((f"{sheet}_{block}_{weight_name}.csv", pd.DataFrame({"Size": x, "Value": y}).to_csv(index=False)))
         
             ax.set_xlim([0, x_limit])
@@ -149,10 +147,11 @@ if dls_file:
             ax.set_xlabel("Diameter (nm)")
             ax.set_ylabel("% (Normalized)" if normalized else "% (Raw)")
             
-            # --- UPDATED TITLE LOGIC ---
-            graph_type = "Back Scatter" if block == "back" else "MADLS"
-            weight_label = ", ".join(weight_names) if is_multi_weight else weight_names[0]
-            ax.set_title(f"{graph_type} - {weight_label}")
+            # --- FIXED TITLE LOGIC ---
+            graph_source = "Back Scatter" if block == "back" else "MADLS"
+            # Join weights for multi-selection or use the single string
+            title_weight = ", ".join(current_weights)
+            ax.set_title(f"{graph_source} Distribution ({title_weight})", fontsize=14, fontweight='bold')
             
             ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
             plt.tight_layout()
@@ -160,33 +159,34 @@ if dls_file:
 
         # --- Section 1: Individual Weighting ---
         st.divider()
-        st.subheader("Individual Weighting Graphs")
+        st.subheader(f"Individual Weighting Overlay: {weight_type}")
         col_bs, col_madls = st.columns(2)
         
         with col_bs:
-            fig_bs = plot_multi_conditions("back", weight_type, bs_x_max)
+            fig_bs = plot_multi_conditions("back", weight_type, bs_x_max, is_multi_weight=False)
             st.pyplot(fig_bs)
             st.download_button("Download BS SVG", get_svg_buffer(fig_bs), "back_scatter.svg", "image/svg+xml")
 
         with col_madls:
-            fig_ma = plot_multi_conditions("madls", weight_type, madls_x_max)
+            fig_ma = plot_multi_conditions("madls", weight_type, madls_x_max, is_multi_weight=False)
             st.pyplot(fig_ma)
             st.download_button("Download MADLS SVG", get_svg_buffer(fig_ma), "madls.svg", "image/svg+xml")
 
         # --- Section 2: Multi-Weighting ---
-        st.divider()
-        st.subheader("Multi-Weighting Overlay Graph")
-        col_multi_bs, col_multi_madls = st.columns(2)
-        
-        with col_multi_bs:
-            fig_mbs = plot_multi_conditions("back", multi_weight_selection, bs_x_max, is_multi_weight=True)
-            st.pyplot(fig_mbs)
-            st.download_button("Download Multi-Weight BS SVG", get_svg_buffer(fig_mbs), "multi_weight_bs.svg", "image/svg+xml")
+        if multi_weight_selection:
+            st.divider()
+            st.subheader("Multi-Weighting Overlay Graph")
+            col_multi_bs, col_multi_madls = st.columns(2)
+            
+            with col_multi_bs:
+                fig_mbs = plot_multi_conditions("back", multi_weight_selection, bs_x_max, is_multi_weight=True)
+                st.pyplot(fig_mbs)
+                st.download_button("Download Multi-Weight BS SVG", get_svg_buffer(fig_mbs), "multi_weight_bs.svg", "image/svg+xml")
 
-        with col_multi_madls:
-            fig_mma = plot_multi_conditions("madls", multi_weight_selection, madls_x_max, is_multi_weight=True)
-            st.pyplot(fig_mma)
-            st.download_button("Download Multi-Weight MADLS SVG", get_svg_buffer(fig_mma), "multi_weight_madls.svg", "image/svg+xml")
+            with col_multi_madls:
+                fig_mma = plot_multi_conditions("madls", multi_weight_selection, madls_x_max, is_multi_weight=True)
+                st.pyplot(fig_mma)
+                st.download_button("Download Multi-Weight MADLS SVG", get_svg_buffer(fig_mma), "multi_weight_madls.svg", "image/svg+xml")
 
         st.divider()
         st.download_button("Download All Data (CSV ZIP)", data=make_zip(all_csvs), file_name="dls_data.zip", mime="application/zip")
